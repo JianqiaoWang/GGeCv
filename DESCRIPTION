@@ -1,5 +1,5 @@
 Package: GGeCv
-Title: What the Package Does (One Line, Title Case)
+Title: A general method for calculating the genetic covariance
 Version: 0.0.0.9000
 Authors@R: 
     person(given = "First",
