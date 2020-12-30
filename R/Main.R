@@ -16,12 +16,6 @@
 #' 
 #' 
 
-library(R6)
-library(glmnet)
-library(scalreg)
-source("../Code/Model-fit.R")
-source("../Code/GECV-weight.R")
-
 GECV.EST.MAIN = function(Dataset, type = "split", 
                          intercept = T,scale.lasso = T, 
                          f = linear , g = linear,

@@ -1,5 +1,4 @@
-
-library(R6)
+#' @import R6
 
 #GeCov class
 

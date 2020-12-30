@@ -1,6 +1,21 @@
-library(R6)
-library(glmnet)
-library(scalreg)
+#' Title
+#'
+#' @param Dataset 
+#' @param intercept 
+#' @param scale.lasso 
+#' @param f 
+#' @param g 
+#' @param sd.epsilon 
+#' @param C 
+#' @param sd.v 
+#' @param cvnfolds 
+#'
+#' @return
+#' @import glmnet
+#' @export
+#'
+#' @examples
+#' 
 
 Fitted.model = function(Dataset, intercept = T, scale.lasso = T, 
                         f = linear, g= linear,
