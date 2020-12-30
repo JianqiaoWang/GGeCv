@@ -1,67 +1,9 @@
 
 library(R6)
 
-row.match <- function(x, table, nomatch=NA){
-  if (class(table)=="matrix") table <- as.data.frame(table)
-  if (is.null(dim(x))) x <- as.data.frame(matrix(x,nrow=1))
-  cx <- do.call("paste",c(x[,,drop=FALSE],sep="\r"))
-  ct <- do.call("paste",c(table[,,drop=FALSE],sep="\r"))
-  match(cx,ct,nomatch=nomatch)
-}
-
-match_mat <- function(mat1, mat2){
-  
-  # match row of m1 to m2, and return corresponding index in m2
-  
-  #library(data.table)
-  
-  #mat1 = setkey(data.table(mat1))
-  
-  #mat2 = setkey(data.table(mat2))
-  
-  #index = mat2[mat1 , which=TRUE]
-  
-  #apply(mat1, 2, function(x){
-  
-  #  which( x %in% mat2)
-  
-  #})
-  
-  m3 = rbind(mat1, mat2)
-  
-  index = duplicated(m3)[-c(1:nrow(mat1))]
-  
-  return(index)
-  
-}
-
-mat_union = function(m1, m2){
-  
-  return(unique(rbind(m1,m2)))
-  
-}
-
-mat_intersect = function(m1, m2){
-  
-  m3 <- rbind(m1, m2)
-  
-  intersect = m3[duplicated(m3), , drop = FALSE]
-  
-  return(intersect)
-}
-
-mat_setdiff = function(m1, m2){
-  
-  m3 <- rbind(m1, m2)
-  
-  setdiff = m3[!duplicated(m3), , drop = FALSE]
-  
-  return(setdiff)
-}
-
 #GeCov class
 
-GeCv <-  R6Class("GeCov", list( X = "matrix",
+GeCv <-  R6::R6Class("GeCov", list( X = "matrix",
                                 beta = "vector",
                                 gamma = "vector",
                                 beta.hat = "matrix",
@@ -114,17 +56,21 @@ GeCv <-  R6Class("GeCov", list( X = "matrix",
                                 },
                                 case.control = function(p1,p0,pi1,pi0){
                                   
-                                  w0 = p0/pi0
+                                  w0 = p0/pi0 
                                   
-                                  w1 = p1/pi1
+                                  w1 = p1/pi1 
                                   
                                   self$weight = self$Y
                                   
                                   self$weight[is.na(self$Y)] = 1
                                   
-                                  self$weight[(self$Y == 1)] = w1
+                                  self$weight[which(self$Y == 1)] = w1
                                   
-                                  self$weight[(self$Y == 0)] = w0
+                                  self$weight[which(self$Y == 0)] = w0
+                                  
+                                  self$weight = self$weight #* 100
+                                  
+                                  self$beta.hat[1] = self$beta.hat[1] + log(w1/w0)
                                   
                                 },
                                 estimator =  function(){
@@ -159,9 +105,9 @@ GeCv <-  R6Class("GeCov", list( X = "matrix",
                                   
                                   self$v.hat[is.na(self$v.hat)] = 0
                                   
-                                  Delta2 = self$Y.hat * self$Z.hat /self$N + 
-                                    self$eps.hat * self$Z.hat /self$N.Y + 
-                                    self$v.hat * self$Y.hat/self$N.Z
+                                  Delta2 = self$weight * self$Y.hat * self$Z.hat /self$N + 
+                                    self$weight * self$eps.hat * self$Z.hat /self$N.Y + 
+                                    self$weight * self$v.hat * self$Y.hat/self$N.Z
                                   
                                   self$inner = sum(Delta2)
                                   
@@ -172,9 +118,9 @@ GeCv <-  R6Class("GeCov", list( X = "matrix",
                                   
                                   self$Inner.est()
                                   
-                                  mu.y.hat = mean(self$Y.hat) + sum(self$eps.hat)/self$N.Y
+                                  mu.y.hat = mean(self$weight * self$Y.hat) + sum( self$weight * self$eps.hat)/self$N.Y
                                   
-                                  mu.z.hat = mean(self$Z.hat) + sum(self$v.hat)/self$N.Z
+                                  mu.z.hat = mean(self$weight * self$Z.hat) + sum( self$weight * self$v.hat)/self$N.Z
                                   
                                   estimator = self$inner - mu.y.hat * mu.z.hat
                                   
@@ -184,14 +130,71 @@ GeCv <-  R6Class("GeCov", list( X = "matrix",
                                   
                                   z.tilde = mean(self$Z, na.rm = T)
                                   
-                                  self$Delta = (self$Y.hat - y.tilde)  * (self$Z.hat - z.tilde) /self$N + 
-                                    self$eps.hat * (self$Z.hat - z.tilde) /self$N.Y + 
-                                    self$v.hat * (self$Y.hat - y.tilde)/self$N.Z
+                                  y.tilde = mu.y.hat
                                   
-                                  estimator.var = length(self$Delta)*var(self$Delta) +  
+                                  z.tilde = mu.z.hat
+                                  
+                                  # self$Delta = self$weight * self$Y.hat * self$Z.hat /self$N + 
+                                  #   self$weight * self$eps.hat * self$Z.hat /self$N.Y + 
+                                  #   self$weight * self$v.hat * self$Y.hat/self$N.Z - 
+                                  #   mu.y.hat * ( self$weight * self$Z.hat/self$N  + self$weight * self$v.hat/self$N.Z )-
+                                  #   mu.z.hat * ( self$weight * self$Y.hat/ self$N + self$weight * self$eps.hat / self$N.Y)
+                                  # 
+                                  self$Delta = self$weight *(self$Y.hat - y.tilde)  * (self$Z.hat - z.tilde) /self$N + 
+                                    self$weight * self$eps.hat * (self$Z.hat - z.tilde) /self$N.Y + 
+                                    self$weight * self$v.hat * (self$Y.hat - y.tilde)/self$N.Z
+                                  
+                                  estimator.var = length(self$Delta)*var(self$Delta ) +  
                                     (sum(self$Delta) -  estimator)^2/self$N
                                   
                                  # plugest = self$plug() - mu.y*mu.z
+                                  
+                                  return(c(estimator, estimator.var))
+                                },
+                                cc.cov.est.hat = function(){
+                                  
+                                  ### cov estimation
+                                  
+                                  self$Inner.est()
+                                  
+                                  mu.y.hat = mean(self$weight * self$Y.hat) + sum( self$weight * self$eps.hat)/self$N.Y
+                                  
+                                  mu.z.hat = mean(self$weight * self$Z.hat) + sum( self$weight * self$v.hat)/self$N.Z
+                                  
+                                  y.tilde = mean(self$Y, na.rm = T)
+                                  
+                                  z.tilde = mean(self$Z, na.rm = T)
+                                  
+                                  estimator = self$inner - mu.y.hat  * mu.z.hat
+                                  
+                                  y.tilde = mu.y.hat
+                                  
+                                  z.tilde = mu.z.hat
+                                  
+                                  # self$Delta = self$weight * self$Y.hat * self$Z.hat /self$N + 
+                                  #   self$weight * self$eps.hat * self$Z.hat /self$N.Y + 
+                                  #   self$weight * self$v.hat * self$Y.hat/self$N.Z - 
+                                  #   mu.y.hat * ( self$weight * self$Z.hat/self$N  + self$weight * self$v.hat/self$N.Z )-
+                                  #   mu.z.hat * ( self$weight * self$Y.hat/ self$N + self$weight * self$eps.hat / self$N.Y)
+                                  # 
+                                  self$Delta = self$weight *(self$Y.hat - y.tilde)  * (self$Z.hat - z.tilde) /self$N + 
+                                    self$weight * self$eps.hat * (self$Z.hat - z.tilde) /self$N.Y + 
+                                    self$weight * self$v.hat * (self$Y.hat - y.tilde)/self$N.Z
+                                  
+                                
+                                 # self$Delta = self$weight * self$Y.hat * self$Z.hat /self$N + 
+                                 #   self$weight * self$eps.hat * self$Z.hat /self$N.Y + 
+                                 #   self$weight * self$v.hat * self$Y.hat/self$N.Z
+                                  
+                                  
+                                  
+                                  estimator.var = 
+                                    length(which(self$Y == 1))*var(self$Delta[which(self$Y == 1)])+
+                                    length(which(self$Y == 0))*var(self$Delta[which(self$Y == 0)])+ 
+                                    length(which(!is.na(self$Z) ))*var(self$Delta[!is.na(self$Z)])
+                                    #(sum(self$Delta) -  estimator)^2/self$N
+                                  
+                                  # plugest = self$plug() - mu.y*mu.z
                                   
                                   return(c(estimator, estimator.var))
                                 },
@@ -363,17 +366,6 @@ GeCv <-  R6Class("GeCov", list( X = "matrix",
 )
 )
 
-expit = function(x){
-  exp(x)/(1 + exp(x))
-}
-
-linear = function(x){
-  return(x)
-}
-
-expn = function(x){
-  return(x)
-}
 
 
 
